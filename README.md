@@ -1,3 +1,9 @@
 # Bubble
-This project will have both Android native and react-native verion.
-In development.
+react-native practice project.
+
+![](/screenshots/screenshot_1.png)
+
+![](/screenshots/screenshot_2.png)
+
+![](/screenshots/screenshot_3.png)
+
