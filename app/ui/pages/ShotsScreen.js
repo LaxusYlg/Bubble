@@ -1,100 +1,267 @@
 import React, {Component} from "react";
-import {ScrollView, StyleSheet, Text, TouchableHighlight, TouchableNativeFeedback, View} from "react-native";
+import {
+    ActivityIndicator,
+    Dimensions,
+    Image,
+    Text,
+    ToastAndroid,
+    TouchableNativeFeedback,
+    TouchableOpacity,
+    View
+} from "react-native";
+import ShotsFlatList from "../component/ShotsFlatList";
 
 const ShotRepo = require("../../api/ShotRepo");
+const DateUtils = require("../../utils/DateUtils");
+const NumberUtils = require("../../utils/NumberUtils");
+
+const windowWidth = Dimensions.get('window').width;
 
 export default class ShotsScreen extends Component {
 
     constructor(props) {
         super(props);
-        this.state = {data: "empty"};
+        this.state = {
+            shots: [],
+            popular: {},
+            init: false,
+            initError: false,
+            refreshing: false,
+            noData: false,
+            noMoreData: false,
+            curPage: 1
+        };
     }
 
-    _onReset() {
-        this.setState({data: "reset"});
+    _init() {
+        ShotRepo.getShots({pageSize: 1}).then((result) => {
+            if (result && result.length > 0) {
+                this.setState({popular: result[0]});
+            }
+            return ShotRepo.getShots({sort: 'recent'});
+        }).then((result) => {
+            if (result && result.length > 0) {
+                let dataBlob = [];
+                let index = 0;
+                result.map((item) => {
+                    dataBlob.push({
+                        key: index,
+                        value: item,
+                    });
+                    index++;
+                });
+                this.setState({shots: dataBlob, init: true});
+            } else {
+                this.setState({noData: true, init: true});
+            }
+        }).catch((error) => {
+            this.setState({initError: true, init: true});
+            ToastAndroid.show(error, ToastAndroid.SHORT);
+        });
+    }
+
+    _onRefresh = () => {
+        this.setState({refreshing: true});
+        ShotRepo.getShots({PageSize: 1}).then(() => {
+            if (result && result.length > 0) {
+                this.setState({popular: result[0]});
+            }
+            return ShotRepo.getShots({sort: 'recent'});
+        }).then((result) => {
+            if (result && result.length > 0) {
+                let dataBlob = [];
+                let index = 0;
+                result.map((item) => {
+                    dataBlob.push({
+                        key: index,
+                        value: item,
+                    });
+                    index++;
+                });
+                this.setState({shots: dataBlob, refreshing: false, curPage: 1});
+            } else {
+                this.setState({noData: true, curPage: 1});
+            }
+        }).catch((error) => {
+            this.setState({refreshing: false});
+            ToastAndroid.show(error, ToastAndroid.SHORT);
+        });
     };
 
-    _onListShot() {
-        ShotRepo.getShots({'page': 1}).then((response) => {
-            return response.text();
-        }).then((result) => {
-            this.setState({data: result});
+    _onReachEnd = () => {
+        let page = this.state.curPage + 1;
+        ShotRepo.getShots({sort: 'recent', page: page}).then((result) => {
+            if (result && result.length > 0) {
+                let dataBlob = this.state.shots;
+                let index = dataBlob.length;
+                result.map((item) => {
+                    dataBlob.push({
+                        key: index,
+                        value: item
+                    });
+                    index++;
+                });
+                this.setState({shots: dataBlob, curPage: page});
+            } else {
+                this.setState({noMoreData: true});
+            }
         }).catch((error) => {
-            this.setState({data: error});
+            ToastAndroid.show(error, ToastAndroid.SHORT);
         })
     };
 
-    _onShot() {
-        if (this.state.data) {
-            let json = JSON.parse(this.state.data);
-            let firstShot = json[0];
-            let {id} = firstShot;
-            ShotRepo.getShotById(id).then((response) => {
-                return response.text();
-            }).then((result) => {
-                this.setState({data: result});
-            }).catch((error) => {
-                this.setState({data: error});
-            });
-        } else {
-            this.setState({data: "no shot list"});
+    _renderInit = () => {
+        return (
+            <View style={{flex: 1}}>
+                <ActivityIndicator style={{marginTop: 16}} size={'small'}/>
+            </View>
+        );
+    };
+
+    _renderEmpty = () => {
+        return (
+            <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+                <Text style={{fontSize: 26, color: 'black'}}>EmptyDataSet</Text>
+            </View>
+        );
+    };
+
+    _renderError = () => {
+        return (
+            <View style={{flex: 1}}>
+                <Text style={{fontSize: 26, color: 'black'}}>Error</Text>
+            </View>
+        );
+    };
+
+    _renderListHeader = () => {
+        let {title, images, team, user} = this.state.popular;
+        let teamView;
+        if (team) {
+            teamView = (
+                <View style={{flexDirection: 'row', alignItems: 'flex-end'}}>
+                    <Text style={{fontSize: 12, color: '#D8D8D8', marginLeft: 3}}>in</Text>
+                    <Text style={{fontSize: 16, color: 'black', marginLeft: 3}}>{team.name}</Text>
+                </View>
+            );
         }
+        return (
+            <TouchableOpacity style={{paddingBottom: 20}} onPress={() => {
+                this.props.screenProps.appNavigator.navigate('Popular');
+            }}>
+                <View style={{backgroundColor: 'white', paddingBottom: 8}}>
+                    <View style={{
+                        flexDirection: 'row',
+                        height: 50,
+                        alignItems: 'center',
+                        paddingLeft: 15,
+                        paddingRight: 15,
+                    }}>
+                        <Image style={{height: 24, width: 24}} resizeMode={'contain'}
+                               resizeMethod={'scale'}
+                               source={require("../../res/image/popular.png")}/>
+
+                        <Text style={{fontSize: 18, color: 'black', marginLeft: 8, flex: 1}}>Popular</Text>
+
+                        <Image style={{height: 16, width: 16}} resizeMode={'contain'}
+                               resizeMethod={'scale'}
+                               source={require("../../res/image/common_arrow_right.png")}/>
+
+                    </View>
+                    <View style={{height: 0.5, alignSelf: 'stretch', backgroundColor: '#D8D8D8'}}/>
+
+                    <View style={{
+                        flexDirection: 'row',
+                        paddingLeft: 15,
+                        paddingRight: 15,
+                        paddingTop: 8,
+                        paddingBottom: 8,
+                        justifyContent: 'space-between'
+                    }}>
+                        <View>
+                            <Text style={{fontSize: 16, color: 'black'}}>{title}</Text>
+
+                            <View style={{flexDirection: 'row', alignItems: 'flex-end', marginTop: 5}}>
+                                <Text style={{fontSize: 10, color: '#D8D8D8'}}>by</Text>
+                                <Text style={{fontSize: 14, color: 'black', marginLeft: 3}}>{user.username}</Text>
+                                {teamView}
+                            </View>
+                        </View>
+
+                        <Image style={{height: 52.5, width: 75}}
+                               source={{uri: images.normal}}
+                               resizeMethod={'scale'}
+                               resizeMode={'contain'}/>
+                    </View>
+                </View>
+
+            </TouchableOpacity>
+        );
+    };
+
+    _renderContent = () => {
+        return (
+            <ShotsFlatList style={{flex: 1}}
+                           refreshing={this.state.refreshing}
+                           onRefreshing={this._onRefresh}
+                           data={this.state.shots}
+                           onEndReached={this._onReachEnd}
+                           renderListHeader={this._renderListHeader}
+                           navigation={this.props.screenProps.appNavigator}/>
+        );
+    };
+
+    componentWillMount() {
+        this._init();
     }
 
     render() {
+        let child;
+        if (!this.state.init) {
+            child = this._renderInit();
+        } else {
+            if (this.state.initError) {
+                child = this._renderError();
+            } else if (this.state.noData) {
+                child = this._renderEmpty();
+            } else {
+                child = this._renderContent();
+            }
+        }
+
         return (
             <View style={{flex: 1}}>
-                <ScrollView style={{flex: 1, padding: 15}}>
-                    <Text>{this.state.data}</Text>
-                </ScrollView>
-                <View style={{height: 2, backgroundColor: 'rgba(255,255,255,8)'}}/>
-                <ScrollView style={{flex: 1}} contentContainerStyle={{alignItems: 'center'}}>
-                    <View style={styles.space}/>
+                <View style={{
+                    height: 44,
+                    alignSelf: 'stretch',
+                    backgroundColor: 'white',
+                    flexDirection: 'row',
+                    justifyContent: 'flex-start',
+                    alignItems: 'center',
+                    elevation: 8,
+                }}>
 
-                    <TouchableHighlight onPress={() => this._onReset()}>
-                        <View style={styles.button}>
-                            <Text style={styles.buttonText}>Reset</Text>
-                        </View>
-                    </TouchableHighlight>
-
-                    <View style={styles.space}/>
-
-                    <TouchableNativeFeedback onPress={() => this._onListShot()}
-                                             background={TouchableNativeFeedback.SelectableBackground()}>
-                        <View style={styles.button}>
-                            <Text style={styles.buttonText}>list shots</Text>
+                    <TouchableNativeFeedback
+                        onPress={() => this.props.navigation.navigate("DrawerOpen")}>
+                        <View style={{height: 44, width: 44, justifyContent: 'center', alignItems: 'center'}}>
+                            <Image style={{height: 24, width: 24}}
+                                   source={require("../../res/image/ic_menu_black_24dp.png")}
+                                   resizeMethod={'scale'} resizeMode={'contain'}/>
                         </View>
                     </TouchableNativeFeedback>
-
-                    <View style={styles.space}/>
-
-                    <TouchableNativeFeedback onPress={() => this._onShot()}
-                                             background={TouchableNativeFeedback.SelectableBackground()}>
-                        <View style={styles.button}>
-                            <Text style={styles.buttonText}>Shot</Text>
-                        </View>
-                    </TouchableNativeFeedback>
-
-                    <View style={styles.space}/>
-                </ScrollView>
+                    <View style={{
+                        height: 44,
+                        width: windowWidth - 88,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                    }}>
+                        <Image style={{height: 32}}
+                               source={require("../../res/image/app_title.png")}
+                               resizeMethod={'scale'} resizeMode={'contain'}/>
+                    </View>
+                </View>
+                {child}
             </View >
         );
     }
 }
-
-const styles = StyleSheet.create({
-    button: {
-        backgroundColor: '#03A9F3',
-        height: 50,
-        width: 260,
-        alignItems: 'center',
-        justifyContent: 'center'
-    },
-    buttonText: {
-        color: 'white',
-        fontSize: 18,
-    },
-    space: {
-        height: 20
-    }
-});

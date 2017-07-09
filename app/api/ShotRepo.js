@@ -8,13 +8,26 @@ var ShotRepo = {
      * @param timeframe
      * @param sort
      * @param page
+     * @param pageSize
      * @returns {*|Promise}
      */
-    getShots: function ({list, timeframe, sort, page}): Promise {
+    getShots: function ({list, timeframe, sort, page, pageSize = 20} = {}): Promise {
         let url = buildUrl("shots");
-        let params = {'list': list, 'timeframe': timeframe, 'sort': sort, 'page': page, 'pageSize': 20};
+        let params = {per_page: pageSize};
+        if (list) {
+            params.list = list;
+        }
+        if (timeframe) {
+            params.timeframe = timeframe;
+        }
+        if (sort) {
+            params.sort = sort;
+        }
+        if (page) {
+            params.page = page;
+        }
         let headers = buildAccessHeader();
-        return NetWork.get(url, headers, params);
+        return NetWork.get(url, headers, params).then((response) => response.json());
     },
 
     /**
@@ -66,10 +79,11 @@ var ShotRepo = {
      * @param id shotId
      * @returns {*|Promise}
      */
-    getShotComments: function (id): Promise {
-        let url = buildUrl("shots/" + id + "comments");
+    getShotComments: function ({id, page, pageSize = 20}): Promise {
+        let url = buildUrl("shots/" + id + "/comments");
         let headers = buildAccessHeader();
-        return NetWork.get(url, headers);
+        let params = {page: page, per_page: pageSize};
+        return NetWork.get(url, headers, params).then((response) => response.json());
     },
 
     /**
